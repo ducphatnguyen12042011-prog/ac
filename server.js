@@ -1,7 +1,7 @@
 const express = require('express');
 const axios = require('axios');
 const app = express();
-app.use(express.json({ limit: '50mb' })); // Cho phép nhận dữ liệu lớn
+app.use(express.json({ limit: '10mb' })); 
 
 const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK;
 const ADMIN_ID = process.env.ADMIN_ID;
@@ -9,22 +9,24 @@ const ADMIN_ID = process.env.ADMIN_ID;
 app.post('/report', async (req, res) => {
     try {
         const { pc_name, user, processes } = req.body;
-        if (!DISCORD_WEBHOOK_URL) return res.status(500).send("Chưa cấu hình Webhook");
+        if (!DISCORD_WEBHOOK_URL) return res.status(500).send("No Webhook Configured");
 
-        // Gom danh sách tên app, xóa trùng và sắp xếp
-        let appList = [...new Set(processes.map(p => p.Name))].sort().join(", ");
+        // Lấy tên app, lọc trùng, xóa khoảng trắng và sắp xếp
+        let list = [...new Set(processes.map(p => p.Name))].sort();
         
-        // Discord giới hạn 2000 ký tự mỗi tin nhắn, mình cắt ở 1800 cho an toàn
-        if (appList.length > 1800) {
-            appList = appList.substring(0, 1800) + "... (Danh sách quá dài, đã cắt bớt)";
+        // Chia danh sách thành các đoạn nhỏ để Discord không bị quá tải
+        let chunk = list.join(", ");
+        if (chunk.length > 1800) {
+            chunk = chunk.substring(0, 1800) + "... (Danh sách quá dài)";
         }
 
         const payload = {
             content: `<@${ADMIN_ID}> 📑 **BÁO CÁO MÁY: ${pc_name}**`,
             embeds: [{
-                title: `Vận động viên: ${user}`,
+                title: `Người dùng: ${user}`,
                 color: 3447003,
-                description: `**Ứng dụng đang chạy:**\n\`\`\`${appList}\`\`\``,
+                description: `**Ứng dụng đang chạy:**\n\`\`\`${chunk}\`\`\``,
+                footer: { text: `Tổng cộng: ${list.length} tiến trình` },
                 timestamp: new Date()
             }]
         };
@@ -33,9 +35,9 @@ app.post('/report', async (req, res) => {
         res.status(200).send("OK");
     } catch (error) {
         console.error("Lỗi gửi Discord:", error.message);
-        res.status(500).send("Lỗi gửi tin nhắn");
+        res.status(500).send("Discord Error");
     }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
+app.listen(PORT, () => console.log(`Server Online` || 3000));
