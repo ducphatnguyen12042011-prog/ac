@@ -3,46 +3,41 @@ const axios = require('axios');
 const app = express();
 app.use(express.json());
 
-// --- CẤU HÌNH ---
-const DISCORD_WEBHOOK_URL = "DÁN_WEBHOOK_CỦA_BẠN_VÀO_ĐÂY";
-const ADMIN_ID = "1482250836108115968";
-
-// Danh sách trắng (Các ứng dụng không bị báo cáo là "lạ")
-const WHITE_LIST = ['discord', 'valorant', 'cs2', 'csgo', 'steam', 'chrome', 'explorer', 'taskmgr', 'nvcontainer', 'nvidia', 'svchost', 'systemsettings'];
+// --- LẤY TỪ ENVIRONMENT CỦA RENDER ---
+const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK;
+const ADMIN_ID = process.env.ADMIN_ID;
 
 app.post('/report', async (req, res) => {
-    const { pc_name, user, processes } = req.body;
-    let blackListFound = [];
-    let strangeApps = [];
-
-    processes.forEach(p => {
-        const name = p.Name.toLowerCase();
-        // 1. Check từ khóa Hack/Cheat
-        if (['cheat', 'hack', 'injector', 'vape', 'aimbot', 'engine'].some(kw => name.includes(kw))) {
-            blackListFound.push(p.Name);
+    try {
+        const { pc_name, user, processes } = req.body;
+        
+        if (!DISCORD_WEBHOOK_URL) {
+            console.error("LỖI: Chưa có Webhook URL trong Environment!");
+            return res.status(500).send("Missing Webhook");
         }
-        // 2. Check ứng dụng lạ (ngoài whitelist)
-        if (!WHITE_LIST.some(w => name.includes(w))) {
-            strangeApps.push(p.Name);
-        }
-    });
 
-    if (blackListFound.length > 0 || strangeApps.length > 0) {
+        // Chuyển danh sách object processes thành một chuỗi tên ứng dụng
+        const allApps = processes.map(p => p.Name).filter(n => n).join(", ");
+
         const payload = {
-            content: `<@${ADMIN_ID}> 🚨 **CẢNH BÁO TỪ MÁY: ${pc_name}**`,
+            content: `<@${ADMIN_ID}> 📑 **BÁO CÁO TOÀN BỘ TIẾN TRÌNH: ${pc_name}**`,
             embeds: [{
                 title: `Vận động viên: ${user}`,
-                color: blackListFound.length > 0 ? 15158332 : 16776960,
-                fields: [
-                    { name: "❌ PHẦN MỀM CẤM", value: blackListFound.length > 0 ? blackListFound.join(", ") : "Sạch", inline: false },
-                    { name: "❓ ỨNG DỤNG LẠ", value: strangeApps.length > 0 ? strangeApps.slice(0, 15).join(", ") : "Không có", inline: false }
-                ],
+                color: 3447003, // Màu xanh dương chuyên nghiệp
+                description: `**Danh sách ứng dụng đang chạy:**\n\`\`\`${allApps.substring(0, 3800)}\`\`\``, 
+                footer: { text: "Hệ thống giám sát giải đấu - Live Monitor" },
                 timestamp: new Date()
             }]
         };
+
         await axios.post(DISCORD_WEBHOOK_URL, payload);
+        console.log(`Đã gửi báo cáo cho máy: ${pc_name}`);
+        res.status(200).send("OK");
+
+    } catch (error) {
+        console.error("Lỗi gửi Discord:", error.message);
+        res.status(500).send("Error");
     }
-    res.status(200).send("OK");
 });
 
 const PORT = process.env.PORT || 3000;
