@@ -10,38 +10,41 @@ app.post('/report', async (req, res) => {
     try {
         const { pc_name, user, processes } = req.body;
         
-        // 1. Lọc lấy danh sách tên, bỏ trùng
-        let allNames = [...new Set(processes.map(p => p.Name))].sort();
+        // 1. Lọc danh sách: Bỏ các tiến trình hệ thống nhàm chán
+        const systemExclude = [
+            'svchost', 'conhost', 'dllhost', 'runtimebroker', 'wmiprvse', 'taskhostw', 
+            'backgroundtaskhost', 'fontdrvhost', 'sihost', 'smartscreen', 'smss', 
+            'services', 'lsass', 'wininit', 'winlogon', 'csrss', 'dwm', 'explorer'
+        ];
+        
+        let allNames = [...new Set(processes.map(p => p.Name))];
+        let filteredApps = allNames.filter(name => !systemExclude.includes(name.toLowerCase())).sort();
 
-        // 2. Tìm kiếm gian lận (Hack/Cheat/Injector)
-        const dangerKeywords = ['cheat', 'hack', 'injector', 'vape', 'aimbot', 'engine', 'artmoney', 'lagswitch'];
+        // 2. Tìm kiếm từ khóa Hack/Cheat
+        const dangerKeywords = ['cheat', 'hack', 'injector', 'vape', 'aimbot', 'engine', 'artmoney'];
         let alerts = allNames.filter(name => 
             dangerKeywords.some(kw => name.toLowerCase().includes(kw))
         );
 
-        // 3. Loại bỏ bớt các tiến trình hệ thống nhàm chán để báo cáo gọn hơn
-        const systemStuff = ['svchost', 'conhost', 'dllhost', 'runtimebroker', 'wmiprvse', 'taskhostw', 'backgroundtaskhost', 'fontdrvhost'];
-        let cleanList = allNames.filter(name => !systemStuff.includes(name.toLowerCase()));
-
-        // Gửi tin nhắn
+        // 3. Tạo nội dung hiển thị gọn gàng
         const payload = {
-            content: alerts.length > 0 ? `<@${ADMIN_ID}> ⚠️ **CẢNH BÁO NGUY HIỂM!**` : `📑 **Báo cáo máy: ${pc_name}**`,
+            content: alerts.length > 0 ? `<@${ADMIN_ID}> ⚠️ **CẢNH BÁO PHÁT HIỆN NGHI VẤN!**` : `📑 **BÁO CÁO MÁY: ${pc_name}**`,
             embeds: [{
                 title: `Vận động viên: ${user}`,
                 color: alerts.length > 0 ? 15158332 : 3066993, // Đỏ nếu có nghi vấn, Xanh nếu sạch
                 fields: [
                     { 
-                        name: "❌ NGHI VẤN HACK/CHEAT", 
+                        name: "❌ TIẾN TRÌNH NGHI VẤN", 
                         value: alerts.length > 0 ? `\`\`\`diff\n- ${alerts.join("\n- ")}\`\`\`` : "`Sạch`", 
                         inline: false 
                     },
                     { 
-                        name: "🎮 ỨNG DỤNG ĐANG CHẠY", 
-                        value: `\`\`\`${cleanList.slice(0, 50).join(", ")}${cleanList.length > 50 ? "..." : ""}\`\`\``, 
+                        name: "🎮 ỨNG DỤNG ĐANG CHẠY (Đã rút gọn)", 
+                        value: filteredApps.length > 0 ? `\`\`\`${filteredApps.join(", ")}\`\`\`` : "`Chỉ có tiến trình hệ thống`", 
                         inline: false 
                     }
                 ],
-                footer: { text: `Tổng cộng ${allNames.length} tiến trình đang chạy.` },
+                footer: { text: `Đã lọc từ ${allNames.length} tiến trình gốc.` },
                 timestamp: new Date()
             }]
         };
@@ -54,4 +57,4 @@ app.post('/report', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server gọn gàng đã sẵn sàng!`));
+app.listen(PORT, () => console.log(`Server Online`));
